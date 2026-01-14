@@ -1,0 +1,5 @@
+{
+  "name": "RecruitSandbox AI",
+  "description": "A professional recruitment tool that transforms raw hiring notes into polished LinkedIn job descriptions and comprehensive behavioral interview guides using Gemini's advanced reasoning.",
+  "requestFramePermissions": []
+}
