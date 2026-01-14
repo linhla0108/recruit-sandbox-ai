@@ -74,12 +74,37 @@ export class RecruitmentService {
     }
   }
 
-  async *streamChat(message: string, history: { role: 'user' | 'model', parts: { text: string }[] }[]) {
-    const chat = this.ai.chats.create({
+  async *streamChat(message: string, currentNotes: string, history: { role: 'user' | 'model', parts: { text: string }[] }[]) {
+    const aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    
+    const contextStr = currentNotes ? `
+      GHI CHÚ HIỆN TẠI TRONG SANDBOX:
+      """
+      ${currentNotes}
+      """
+    ` : "Chưa có ghi chú nào trong sandbox.";
+
+    const systemInstruction = `
+      Bạn là một Chuyên gia Tuyển dụng AI. Nhiệm vụ của bạn là giúp người dùng tinh chỉnh yêu cầu tuyển dụng của họ.
+      
+      Quy tắc trả lời:
+      1. Trả lời mạch lạc, sử dụng nhiều dòng và dấu gạch đầu dòng để dễ đọc.
+      2. Nếu người dùng yêu cầu thay đổi, thêm bớt hoặc chỉnh sửa nội dung tuyển dụng:
+         a. Giải thích ngắn gọn bạn định thay đổi gì.
+         b. Sau đó, tổng hợp lại TOÀN BỘ nội dung "Ghi chú tuyển dụng" mới bao gồm cả những thay đổi đó.
+         c. Bọc nội dung ghi chú mới này trong thẻ: [REVISED_PROMPT]...nội dung ghi chú mới ở đây...[/REVISED_PROMPT]
+      
+      Mục tiêu của bạn là tạo ra một bản ghi chú đầy đủ, chi tiết hơn để khi đưa vào sandbox, AI sẽ tạo ra JD và bộ câu hỏi phỏng vấn chất lượng nhất.
+      
+      Ngữ cảnh hiện tại:
+      ${contextStr}
+    `;
+
+    const chat = aiInstance.chats.create({
       model: MODEL_NAME,
       config: {
-        systemInstruction: "You are an expert Recruitment AI Assistant. You help recruiters refine job descriptions, prepare for interviews, and understand market trends. Be concise, professional, and helpful.",
-        thinkingConfig: { thinkingBudget: 32768 }
+        systemInstruction,
+        thinkingConfig: { thinkingBudget: 16000 }
       },
     });
 

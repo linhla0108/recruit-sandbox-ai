@@ -3,11 +3,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import { recruitmentService } from '../services/gemini';
 import { ChatMessage } from '../types';
 
-const ChatBot: React.FC = () => {
+interface Props {
+  currentNotes: string;
+  onApplyRevisedNotes: (newNotes: string) => void;
+}
+
+const ChatBot: React.FC<Props> = ({ currentNotes, onApplyRevisedNotes }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -16,6 +22,17 @@ const ChatBot: React.FC = () => {
     }
   }, [messages, isOpen]);
 
+  const extractRevisedPrompt = (text: string): { cleanText: string; prompt: string | null } => {
+    const regex = /\[REVISED_PROMPT\]([\s\S]*?)\[\/REVISED_PROMPT\]/;
+    const match = text.match(regex);
+    if (match) {
+      const prompt = match[1].trim();
+      const cleanText = text.replace(regex, '').trim();
+      return { cleanText, prompt };
+    }
+    return { cleanText: text, prompt: null };
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
@@ -23,6 +40,7 @@ const ChatBot: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
+    setPendingPrompt(null);
 
     try {
       const history = messages.map(m => ({
@@ -30,7 +48,7 @@ const ChatBot: React.FC = () => {
         parts: [{ text: m.text }]
       }));
 
-      const stream = recruitmentService.streamChat(inputValue, history);
+      const stream = recruitmentService.streamChat(inputValue, currentNotes, history);
       let assistantText = '';
       
       setMessages(prev => [...prev, { role: 'model', text: '' }]);
@@ -43,20 +61,37 @@ const ChatBot: React.FC = () => {
           return newMessages;
         });
       }
+
+      const { cleanText, prompt } = extractRevisedPrompt(assistantText);
+      if (prompt) {
+        setPendingPrompt(prompt);
+        setMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[newMessages.length - 1].text = cleanText;
+          return newMessages;
+        });
+      }
     } catch (error) {
       console.error("Chat error:", error);
-      setMessages(prev => [...prev, { role: 'model', text: "I'm sorry, I encountered an error. Please try again." }]);
+      setMessages(prev => [...prev, { role: 'model', text: "Tôi xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại." }]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleApplyAction = () => {
+    if (pendingPrompt) {
+      onApplyRevisedNotes(pendingPrompt);
+      setPendingPrompt(null);
+      setIsOpen(false); // Close chat to show the sandbox update
+    }
+  };
+
   return (
     <>
-      {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-105 z-50 ${isOpen ? 'bg-slate-800 rotate-90' : 'bg-indigo-600 rotate-0'}`}
+        className={`fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-105 z-50 ${isOpen ? 'bg-slate-800' : 'bg-indigo-600'}`}
       >
         {isOpen ? (
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +104,6 @@ const ChatBot: React.FC = () => {
         )}
       </button>
 
-      {/* Chat Window */}
       {isOpen && (
         <div className="fixed bottom-24 right-6 w-96 max-h-[600px] h-[70vh] bg-white rounded-2xl shadow-2xl flex flex-col border border-slate-200 z-50 overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-slate-800 p-4 flex items-center justify-between">
@@ -77,7 +111,6 @@ const ChatBot: React.FC = () => {
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <span className="text-white font-medium text-sm">RecruitAI Assistant</span>
             </div>
-            <div className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Powered by Gemini 3</div>
           </div>
 
           <div 
@@ -86,20 +119,46 @@ const ChatBot: React.FC = () => {
           >
             {messages.length === 0 && (
               <div className="text-center py-10 px-6 text-slate-400 text-sm">
-                Ask me anything about recruiting, role definitions, or interview strategies!
+                Chào bạn! Tôi có thể giúp bạn tinh chỉnh ghi chú tuyển dụng. Bạn muốn thêm yêu cầu hay thay đổi gì không?
               </div>
             )}
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
+                <div className={`max-w-[90%] p-3 rounded-2xl text-sm shadow-sm ${
                   m.role === 'user' 
                     ? 'bg-indigo-600 text-white rounded-tr-none' 
-                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm'
+                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
                 }`}>
-                  {m.text || <div className="flex gap-1 py-1"><div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"></div><div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce delay-100"></div><div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce delay-200"></div></div>}
+                  <div className="whitespace-pre-wrap leading-relaxed">
+                    {m.text || (
+                      <div className="flex gap-1 py-1">
+                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce delay-200"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
+            
+            {pendingPrompt && (
+              <div className="flex justify-start animate-in fade-in zoom-in duration-300">
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 w-[90%] space-y-3">
+                  <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Đề xuất ghi chú mới</p>
+                  <p className="text-xs text-slate-500 line-clamp-3 italic">"{pendingPrompt}"</p>
+                  <button 
+                    onClick={handleApplyAction}
+                    className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Cập nhật & Tạo lại Sandbox
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <form 
@@ -110,13 +169,13 @@ const ChatBot: React.FC = () => {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Type your question..."
+              placeholder="Yêu cầu sửa đổi ghi chú..."
               className="flex-1 bg-slate-100 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
             <button 
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center disabled:opacity-50 transition-colors"
+              className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center disabled:opacity-50 transition-colors shrink-0"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />

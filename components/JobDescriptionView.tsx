@@ -14,13 +14,13 @@ ${data.title} at ${data.companyName} (${data.location})
 ${data.summary}
 
 Key Responsibilities:
-${data.responsibilities.map(r => `• ${r}`).join('\n')}
+${(data.responsibilities || []).map(r => `• ${r}`).join('\n')}
 
 What We're Looking For:
-${data.qualifications.map(q => `• ${q}`).join('\n')}
+${(data.qualifications || []).map(q => `• ${q}`).join('\n')}
 
 Benefits:
-${data.benefits.map(b => `• ${b}`).join('\n')}
+${(data.benefits || []).map(b => `• ${b}`).join('\n')}
 
 ${data.callToAction}
     `.trim();
@@ -49,46 +49,47 @@ ${data.callToAction}
       </div>
       <div className="p-6 space-y-6 text-slate-700">
         <div>
-          <h4 className="text-2xl font-bold text-slate-900">{data.title}</h4>
-          <p className="text-slate-500 font-medium">{data.companyName} • {data.location}</p>
+          <h4 className="text-2xl font-bold text-slate-900">{data.title || 'Chưa rõ chức danh'}</h4>
+          <p className="text-slate-500 font-medium">{data.companyName || 'Công ty'} • {data.location || 'Địa điểm'}</p>
         </div>
 
         <section>
           <h5 className="font-bold text-slate-900 mb-2">Summary</h5>
-          <p className="leading-relaxed whitespace-pre-line">{data.summary}</p>
+          <p className="leading-relaxed whitespace-pre-line">{data.summary || 'Đang cập nhật...'}</p>
         </section>
 
         <section>
           <h5 className="font-bold text-slate-900 mb-2">Key Responsibilities</h5>
           <ul className="list-disc pl-5 space-y-1">
-            {data.responsibilities.map((r, i) => (
+            {data.responsibilities?.map((r, i) => (
               <li key={i}>{r}</li>
             ))}
+            {(!data.responsibilities || data.responsibilities.length === 0) && <li className="text-slate-400 italic">Không có thông tin</li>}
           </ul>
         </section>
 
         <section>
           <h5 className="font-bold text-slate-900 mb-2">What We're Looking For</h5>
           <ul className="list-disc pl-5 space-y-1">
-            {data.qualifications.map((q, i) => (
+            {data.qualifications?.map((q, i) => (
               <li key={i}>{q}</li>
             ))}
+            {(!data.qualifications || data.qualifications.length === 0) && <li className="text-slate-400 italic">Không có thông tin</li>}
           </ul>
         </section>
 
-        {data.benefits && data.benefits.length > 0 && (
-          <section>
-            <h5 className="font-bold text-slate-900 mb-2">Benefits</h5>
-            <ul className="list-disc pl-5 space-y-1">
-              {data.benefits.map((b, i) => (
-                <li key={i}>{b}</li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <section>
+          <h5 className="font-bold text-slate-900 mb-2">Benefits</h5>
+          <ul className="list-disc pl-5 space-y-1">
+            {data.benefits?.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+            {(!data.benefits || data.benefits.length === 0) && <li className="text-slate-400 italic">Không có thông tin</li>}
+          </ul>
+        </section>
 
         <div className="pt-4 border-t border-slate-100 italic text-slate-500">
-          {data.callToAction}
+          {data.callToAction || 'Apply now!'}
         </div>
       </div>
     </div>
